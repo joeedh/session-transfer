@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join, isAbsolute } from "node:path";
-import type { OS, PeerConfig, RelayConfig } from "./types.js";
+import type { OS, RawPeerConfig, RelayConfig } from "./types.js";
 
 /**
  * Config resolution order (first hit wins):
@@ -37,18 +37,20 @@ export function loadConfig(cwd = process.cwd()): RelayConfig {
   return raw as RelayConfig;
 }
 
-function validatePeer(p: PeerConfig, path: string): void {
+function validatePeer(p: RawPeerConfig, path: string): void {
   if (!p.name) throw new Error(`relay config: a peer is missing "name" (in ${path})`);
-  if (!["wsl", "windows", "ssh"].includes(p.kind))
+  if (!["wsl", "windows", "ssh", "docker"].includes(p.kind))
     throw new Error(`relay config: peer "${p.name}" has invalid kind "${p.kind}"`);
-  if (!["windows", "linux"].includes(p.os))
+  if (p.os !== undefined && !["windows", "linux"].includes(p.os))
     throw new Error(`relay config: peer "${p.name}" has invalid os "${p.os}"`);
-  if (!p.repoRoot) throw new Error(`relay config: peer "${p.name}" is missing "repoRoot"`);
+  // docker peers probe their repoRoot at resolve time, so it's optional there.
+  if (p.kind !== "docker" && !p.repoRoot)
+    throw new Error(`relay config: peer "${p.name}" is missing "repoRoot"`);
   if (p.kind === "ssh" && !p.sshTarget)
     throw new Error(`relay config: ssh peer "${p.name}" needs "sshTarget"`);
 }
 
-export function getPeer(config: RelayConfig, name: string): PeerConfig {
+export function getPeer(config: RelayConfig, name: string): RawPeerConfig {
   const peer = config.peers.find((p) => p.name === name);
   if (!peer) {
     const names = config.peers.map((p) => p.name).join(", ");

@@ -53,7 +53,10 @@ so we never depend on a bridge or on env expansion inside quotes:
   writes it with `[IO.File]::WriteAllText`.
 - **linux:** `dest="$HOME/.claude/projects/<enc>/<id>.jsonl"; mkdir -p ... && cat > "$dest"`.
 
-The content is fed to that command on **stdin**.
+The content is fed to that command on **stdin**. A `docker` peer uses the linux branch,
+delivered through `docker exec -i` — the `-i` keeps stdin open so the transcript pipes in.
+Because resuming needs `claude` in the container, the CLI probes it first and
+`--install-claude` will install it on demand (see `configuration.md`).
 
 ## Resuming
 

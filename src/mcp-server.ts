@@ -2,9 +2,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { loadConfig, getPeer } from "./config.js";
+import { loadConfig } from "./config.js";
 import { delegate } from "./delegate.js";
 import { prepareHandoff, deliverHandoff } from "./handoff.js";
+import { resolvePeerByName, ensureClaude } from "./resolve.js";
 import { doctor } from "./doctor.js";
 
 const server = new McpServer({ name: "claude-relay", version: "0.1.0" });
@@ -29,7 +30,7 @@ server.registerTool(
   },
   async (args) => {
     const config = loadConfig();
-    const peer = getPeer(config, args.to);
+    const peer = await resolvePeerByName(config, args.to);
     const result = await delegate(peer, {
       task: args.task,
       relevantFiles: args.files,
@@ -56,12 +57,17 @@ server.registerTool(
       session: z.string().optional().describe("session id (default: most recent in this repo)"),
       fork: z.boolean().optional().describe("resume as a forked session on the peer"),
       deliver: z.boolean().optional().describe("write the transcript onto the peer (else dry-run)"),
+      installClaude: z
+        .boolean()
+        .optional()
+        .describe("install claude on the peer if missing (needed to resume)"),
     },
   },
   async (args) => {
     const config = loadConfig();
-    const peer = getPeer(config, args.to);
+    const peer = await resolvePeerByName(config, args.to);
     const plan = prepareHandoff(config, peer, { sessionId: args.session, fork: args.fork });
+    const claude = await ensureClaude(peer, { install: args.installClaude ?? false });
     if (args.deliver) await deliverHandoff(peer, plan);
     return {
       content: [
@@ -70,9 +76,11 @@ server.registerTool(
           text: JSON.stringify(
             {
               sessionId: plan.sessionId,
+              peer: { name: peer.name, kind: peer.kind, container: peer.container },
               peerDestPath: plan.peerDestPath,
               resumeCommand: plan.resumeCommand,
               delivered: args.deliver ?? false,
+              claude: { installed: claude.installed, detail: claude.detail },
             },
             null,
             2,

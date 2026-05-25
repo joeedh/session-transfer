@@ -2,9 +2,14 @@
 
 export type OS = "windows" | "linux";
 
-export type PeerKind = "wsl" | "windows" | "ssh";
+export type PeerKind = "wsl" | "windows" | "ssh" | "docker";
 
-/** A reachable Claude Code peer: another OS/checkout we can delegate work to. */
+/**
+ * A reachable Claude Code peer: another OS/checkout we can delegate work to.
+ * This is the *resolved*, execution-ready shape — `repoRoot` and `os` are known.
+ * The config file holds {@link RawPeerConfig}, where they may be omitted and
+ * filled in by discovery/probing (see `resolve.ts`).
+ */
 export interface PeerConfig {
   /** Stable name used on the CLI / MCP (`--to <name>`), e.g. "windows", "wsl", "gpubox". */
   name: string;
@@ -19,12 +24,24 @@ export interface PeerConfig {
   distro?: string;
   /** ssh (future): user@host or an ssh config alias. */
   sshTarget?: string;
+  /** docker: container name or id. Auto-discovered from the devcontainer label if omitted. */
+  container?: string;
+}
+
+/**
+ * A peer entry exactly as it appears in the config file. `os` and `repoRoot`
+ * are optional: for a `docker` peer they're discovered/probed at resolve time,
+ * and `os` defaults per kind. Resolution turns this into a {@link PeerConfig}.
+ */
+export interface RawPeerConfig extends Omit<PeerConfig, "os" | "repoRoot"> {
+  os?: OS;
+  repoRoot?: string;
 }
 
 export interface RelayConfig {
   /** Absolute path to the repo checkout on THIS machine. */
   repoRoot: string;
-  peers: PeerConfig[];
+  peers: RawPeerConfig[];
 }
 
 /** Billing controls applied to every spawned peer claude process. */

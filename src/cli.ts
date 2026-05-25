@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { writeFileSync } from "node:fs";
-import { loadConfig, getPeer } from "./config.js";
+import { loadConfig } from "./config.js";
 import { delegate } from "./delegate.js";
 import { prepareHandoff, deliverHandoff } from "./handoff.js";
+import { resolvePeerByName, listAllPeers, ensureClaude } from "./resolve.js";
 import { doctor } from "./doctor.js";
 import type { DelegateOptions } from "./delegate.js";
 
@@ -55,7 +56,14 @@ Delegate options:
   --apply                apply the returned git bundle into the local checkout
 
 Handoff options:
+  --session <id>         session to hand off (default: most recent in this repo)
+  --fork                 resume as a forked session on the peer
   --deliver              write the translated transcript onto the peer (else dry-run)
+  --install-claude       install claude on the peer if missing (needed to resume)
+
+Peers may be "wsl", "windows", "ssh", or "docker". A docker peer needs no config:
+a running devcontainer whose devcontainer.local_folder label matches this repo is
+auto-discovered and reachable as --to docker (its repoRoot is probed in-container).
 `;
 
 async function main(): Promise<void> {
@@ -68,7 +76,14 @@ async function main(): Promise<void> {
   }
 
   if (cmd === "config") {
-    console.log(JSON.stringify(loadConfig(), null, 2));
+    const config = loadConfig();
+    console.log(JSON.stringify(config, null, 2));
+    const { resolved, errors } = await listAllPeers(config);
+    console.log(`\nresolved peers (incl. auto-discovered docker):`);
+    for (const p of resolved) {
+      console.log(`  ${p.name}  [${p.kind}${p.container ? `: ${p.container}` : ""}]  ${p.os}  ${p.repoRoot}`);
+    }
+    for (const e of errors) console.log(`  ${e.name}  (unresolved: ${e.error})`);
     return;
   }
 
@@ -86,7 +101,7 @@ async function main(): Promise<void> {
     const config = loadConfig();
     const to = str(flags.to) ?? die("--to <peer> is required");
     const task = str(flags.task) ?? die('--task "<text>" is required');
-    const peer = getPeer(config, to);
+    const peer = await resolvePeerByName(config, to);
     const opts: DelegateOptions = {
       task,
       relevantFiles: str(flags.files)?.split(",").map((s) => s.trim()).filter(Boolean),
@@ -121,18 +136,28 @@ async function main(): Promise<void> {
   if (cmd === "handoff") {
     const config = loadConfig();
     const to = str(flags.to) ?? die("--to <peer> is required");
-    const peer = getPeer(config, to);
+    const peer = await resolvePeerByName(config, to);
     const plan = prepareHandoff(config, peer, {
       sessionId: str(flags.session),
       fork: flags.fork === true,
     });
     console.log(`session:     ${plan.sessionId}`);
     console.log(`source:      ${plan.transcriptPath}`);
+    console.log(`peer:        ${peer.name} (${peer.kind}${peer.container ? `: ${peer.container}` : ""})`);
     console.log(`peer dest:   ${plan.peerDestPath}`);
     console.log(`then run on "${peer.name}":\n  ${plan.resumeCommand}`);
+
+    // Resuming on the peer needs claude installed there. Probe it; install only
+    // if the user opted in with --install-claude.
+    const claude = await ensureClaude(peer, { install: flags["install-claude"] === true });
+    console.log(`\nclaude on peer: ${claude.detail}`);
+
     if (flags.deliver === true) {
       await deliverHandoff(peer, plan);
       console.log(`\n✓ transcript delivered to peer.`);
+      if (!claude.installed) {
+        console.log(`⚠ claude is not runnable on the peer yet — resume will fail until it is installed.`);
+      }
     } else {
       console.log(`\n(dry run — pass --deliver to write it onto the peer)`);
     }

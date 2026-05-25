@@ -21,6 +21,12 @@
       "os": "linux",
       "sshTarget": "gpubox",
       "repoRoot": "/home/youruser/dev/session-transfer"
+    },
+    {
+      "name": "dev",
+      "kind": "docker",
+      "_comment": "A devcontainer for this repo is auto-discovered even without this entry; set container/repoRoot to pin a specific or non-devcontainer container.",
+      "container": "session-transfer-app-1"
     }
   ]
 }

@@ -12,6 +12,13 @@ const winPeer: PeerConfig = {
   repoRoot: "C:\\dev\\foo",
   claudePath: "C:\\Users\\u\\.local\\bin\\claude.exe",
 };
+const dockerPeer: PeerConfig = {
+  name: "devc",
+  kind: "docker",
+  os: "linux",
+  repoRoot: "/workspaces/foo",
+  container: "foo-app-1",
+};
 
 test("buildBrief includes job id, peer root, and the result protocol", () => {
   const brief = buildBrief("abc123", winPeer, { task: "run nvidia-smi", relevantFiles: ["src/x.ts"] });
@@ -28,6 +35,13 @@ test("buildShellSpec wraps wsl peer in bash -lc with cd", () => {
   assert.deepEqual(spec.args.slice(0, 4), ["-d", "Ubuntu", "--", "bash"]);
   assert.equal(spec.args[4], "-lc");
   assert.match(spec.args[5]!, /^cd '\/home\/u\/dev\/foo' && git status$/);
+});
+
+test("buildShellSpec wraps docker peer in docker exec -i bash -lc with cd", () => {
+  const spec = buildShellSpec(dockerPeer, "git status");
+  assert.equal(spec.file, "docker");
+  assert.deepEqual(spec.args.slice(0, 5), ["exec", "-i", "foo-app-1", "bash", "-lc"]);
+  assert.match(spec.args[5]!, /^cd '\/workspaces\/foo' && git status$/);
 });
 
 test("buildShellSpec uses cmd /d /s /c for windows peer", () => {

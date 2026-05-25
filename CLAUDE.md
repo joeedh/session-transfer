@@ -20,8 +20,11 @@ These came directly from the user and must be preserved in any change:
    only the **process boundary**; move control data over **stdin/stdout** and code over
    **git** (bundle piped on stdout). Path translation is **repo-root-relative**, never
    `wslpath`.
-3. **Peers are pluggable** (`wsl` / `windows` / `ssh`) so a remote Linux box drops in
-   later with no core change.
+3. **Peers are pluggable** (`wsl` / `windows` / `ssh` / `docker`) so a remote Linux box or
+   container drops in with no core change. `docker` peers auto-discover from the
+   `devcontainer.local_folder` label and probe their repo root in-container (`src/resolve.ts`).
+   Entry points call `resolvePeerByName` before use; execution code still receives a
+   fully-populated `PeerConfig`.
 4. **Billing safety is first-class** — see below.
 5. **pnpm** is the package manager.
 

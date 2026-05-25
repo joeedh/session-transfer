@@ -46,6 +46,7 @@ function cmdq(s: string): string {
  *   wsl     -> wsl.exe [-d <distro>] -- bash -lc 'cd <root> && <command>'
  *   ssh     -> ssh <target> 'cd <root> && <command>'
  *   windows -> cmd.exe /d /s /c "cd /d "<root>" && <command>"
+ *   docker  -> docker exec -i <container> bash -lc 'cd <root> && <command>'
  *
  * The `/s /c "..."` form is the robust cmd quoting: cmd strips only the outer
  * quotes node/WSL-interop adds, leaving inner quoted paths intact.
@@ -60,6 +61,12 @@ export function buildShellSpec(peer: PeerConfig, command: string): SpawnSpec {
     case "ssh": {
       const inner = `cd ${shq(peer.repoRoot)} && ${command}`;
       return { file: "ssh", args: [peer.sshTarget!, inner] };
+    }
+    case "docker": {
+      const inner = `cd ${shq(peer.repoRoot)} && ${command}`;
+      // `-i` keeps stdin open so briefs / handoff content pipe through and binary
+      // stdout (git bundle) passes back unmodified; no `-t` (a TTY would corrupt it).
+      return { file: "docker", args: ["exec", "-i", peer.container!, "bash", "-lc", inner] };
     }
     case "windows": {
       const inner = `cd /d ${cmdq(peer.repoRoot)} && ${command}`;

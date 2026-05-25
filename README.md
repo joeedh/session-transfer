@@ -75,6 +75,24 @@ Config (`relay.config.json`, or per-machine `relay.config.local.json`, or
 }
 ```
 
+### Docker / devcontainers — zero config
+
+A `docker` peer reaches a container via `docker exec`. You usually don't need to declare it
+at all: if a running **VS Code devcontainer** holds this repo, claude-relay auto-discovers
+it and you can target `--to docker` directly. A container matches by its
+`devcontainer.local_folder` label (local-folder devcontainers) or by a `/workspaces`
+checkout with the same git `origin` (repo-volume devcontainers cloned from GitHub). The
+in-container repo root is discovered automatically, so no path needs configuring. To pin a
+specific container (or a non-devcontainer one), add an explicit entry — `container` and
+`repoRoot` override discovery:
+
+```jsonc
+{ "name": "dev", "kind": "docker", "container": "myproj-app-1" }  // repoRoot probed
+```
+
+`claude --resume` needs `claude` installed inside the container; `claude-relay doctor`
+reports if it's missing, and `handoff --install-claude` installs it on demand.
+
 Register the MCP server (already in `.mcp.json` for this repo):
 
 ```json
@@ -92,6 +110,10 @@ claude-relay delegate --to windows \
 # Hand the current conversation off to WSL.
 claude-relay handoff --to wsl --deliver
 # then on WSL:  claude --resume <printed-id>
+
+# Hand off to the repo's running devcontainer (auto-discovered), installing
+# claude in the container first if it's missing.
+claude-relay handoff --to docker --install-claude --deliver
 
 claude-relay doctor      # reachability + billing-safety checks
 claude-relay config      # show resolved config

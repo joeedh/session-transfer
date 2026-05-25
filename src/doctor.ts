@@ -1,6 +1,7 @@
 import type { RelayConfig } from "./types.js";
 import { buildShellSpec, isWsl, localOS, quoteClaude } from "./peer.js";
 import { run } from "./run.js";
+import { listAllPeers } from "./resolve.js";
 import { AGENT_SDK_CREDIT_NOTE, localBillingRoute } from "./billing.js";
 
 export interface DoctorCheck {
@@ -38,7 +39,17 @@ export async function doctor(config: RelayConfig): Promise<DoctorReport> {
         : "no API-key env vars detected; delegated jobs will use the peer's subscription login.",
   });
 
-  for (const peer of config.peers) {
+  // Explicit config peers plus implicitly discovered docker/devcontainer peers.
+  // Resolution failures (e.g. a docker peer with no matching container) surface
+  // as failed checks rather than crashing the whole report.
+  const { resolved, errors } = await listAllPeers(config);
+  for (const e of errors) {
+    checks.push({ name: `peer "${e.name}" resolution`, ok: false, detail: e.error });
+  }
+
+  for (const peer of resolved) {
+    const where =
+      peer.kind === "docker" ? ` (docker: ${peer.container}, repoRoot=${peer.repoRoot})` : "";
     // Reachability + claude presence on the peer, over the process boundary.
     // Probe the configured binary so a custom claudePath is honored.
     const probe = `${quoteClaude(peer)} --version`;
@@ -49,8 +60,10 @@ export async function doctor(config: RelayConfig): Promise<DoctorReport> {
         name: `peer "${peer.name}" claude`,
         ok: found,
         detail: found
-          ? `reachable; claude ${res.stdout.trim().split(/\r?\n/)[0]}`
-          : `claude not runnable (code ${res.code}). ${res.stderr.trim() || res.stdout.trim()}`,
+          ? `reachable${where}; claude ${res.stdout.trim().split(/\r?\n/)[0]}`
+          : `reachable${where} but claude not runnable (code ${res.code}). ` +
+            `${res.stderr.trim() || res.stdout.trim()} ` +
+            `— install with: claude-relay handoff --to ${peer.name} --install-claude`,
       });
 
       // Peer billing route: detect a stray API key on the peer.

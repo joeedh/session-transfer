@@ -13,7 +13,7 @@ around `src/`.
    `cmd.exe` / `ssh`) and moves control data over **stdin/stdout**; code moves only via
    **git** (a bundle piped back over stdout).
 3. **A remote Linux box should drop in later over SSH.** Transport is therefore a
-   pluggable "peer" abstraction from day one (`wsl` / `windows` / `ssh`).
+   pluggable "peer" abstraction from day one (`wsl` / `windows` / `ssh` / `docker`).
 
 These are recorded in memory as `project_two_checkouts` and
 `reference-claude-session-storage`.
@@ -24,7 +24,8 @@ These are recorded in memory as `project_two_checkouts` and
 | --- | --- |
 | `src/types.ts` | Shared types: `OS`, `PeerKind`, `PeerConfig`, `RelayConfig`, `BillingOptions`, `JobCost`, `DelegateResult`. |
 | `src/config.ts` | Config resolution/validation; **repo-root-relative** path translation (`translatePath`, `pathOS`). No `wslpath`. |
-| `src/peer.ts` | The pluggable peer abstraction. `buildShellSpec` turns a command string into a `spawn` spec per peer kind. Per-token shell quoting (`quoteArg`, `composeArgv`). |
+| `src/peer.ts` | The pluggable peer abstraction. `buildShellSpec` turns a command string into a `spawn` spec per peer kind (`wsl`/`windows`/`ssh`/`docker`). Per-token shell quoting (`quoteArg`, `composeArgv`). |
+| `src/resolve.ts` | Peer resolution: fill `os`/`repoRoot`, auto-discover `docker` peers from the `devcontainer.local_folder` label and probe their in-container repo root. `resolvePeerByName`, `listAllPeers`, `ensureClaude` (detect/install claude on a peer). |
 | `src/run.ts` | `run(spec, opts)` — spawns the child, feeds stdin, collects stdout (utf8 or base64), streams NDJSON lines. Owns the `windowsVerbatimArguments` fix. |
 | `src/billing.ts` | The billing-safety subsystem. Env stripping, cost/flag helpers, route detection. Every spawn passes through it. |
 | `src/delegate.ts` | Core feature: build a brief, run headless `claude -p` on the peer, parse the stream, bundle new commits back. |
@@ -62,6 +63,12 @@ The caller writes `bundleBase64` to `relay-<jobId>.bundle` and applies it with
   A shared remote is an optional optimization, not a requirement.
 - **Repo-root-relative path translation, not `wslpath`** — the bridge may not exist, and
   the two roots differ (`C:\dev\foo` vs `/home/u/dev/foo`). See `configuration.md`.
+- **Peers are resolved, not just read** — config holds a `RawPeerConfig` (os/repoRoot may
+  be omitted). Each entry point resolves a peer by name (`resolvePeerByName`, `src/resolve.ts`)
+  just before use. For `docker` this discovers the container via the devcontainer label and
+  probes its repo root over the transport, so a devcontainer needs **no** config and its
+  path can't rot. All execution code still receives a fully-populated `PeerConfig`, so the
+  transport layer (`buildShellSpec` → `run`) is unchanged.
 
 See `delegation.md`, `handoff.md`, `billing-safety.md`, `configuration.md`, `cli.md`, and
 `mcp.md` for the per-area detail.

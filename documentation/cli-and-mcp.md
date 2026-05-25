@@ -7,10 +7,13 @@ MCP server is `src/mcp-server.ts`.
 
 ```
 claude-relay delegate --to <peer> --task "<text>" [options]
-claude-relay handoff  --to <peer> [--session <id>] [--fork] [--deliver]
+claude-relay handoff  --to <peer> [--session <id>] [--fork] [--deliver] [--install-claude]
 claude-relay doctor
 claude-relay config
 ```
+
+`<peer>` is a name from the config, or `docker` (or a container name) for a devcontainer
+auto-discovered for this repo — see `configuration.md`.
 
 ### `delegate`
 
@@ -33,15 +36,21 @@ made commits it writes `relay-<jobId>.bundle` and prints the apply command.
 
 ### `handoff`
 
-Prints the session id, source transcript path, peer destination path, and the
-`claude --resume` command. Defaults to a **dry run**; `--deliver` writes the translated
-transcript onto the peer. `--fork` resumes as a forked session.
+Prints the session id, source transcript path, the resolved peer (kind + container), peer
+destination path, and the `claude --resume` command. Defaults to a **dry run**; `--deliver`
+writes the translated transcript onto the peer. `--fork` resumes as a forked session. It
+also probes `claude` on the peer; `--install-claude` installs it there if missing (required
+before `--resume` will work) — without the flag it just reports the missing binary and the
+install command.
 
 ### `doctor` / `config`
 
 `doctor` prints a `✓`/`✗` line per check (local env, local billing route, each peer's
 claude reachability + billing route) and the Agent-SDK credit note; exits non-zero if any
-check fails. `config` prints the resolved config as JSON.
+check fails. It checks **explicit config peers plus auto-discovered docker peers**, reports
+unresolved peers, and — for a peer missing `claude` — prints the `--install-claude` hint.
+`config` prints the config JSON followed by the resolved peer list (including discovered
+docker peers).
 
 ### Flag parsing note
 
@@ -61,7 +70,7 @@ Build first (`pnpm build`) so `dist/mcp-server.js` exists. Tools (zod input sche
 | Tool | Inputs | Returns |
 | --- | --- | --- |
 | `delegate_to_os` | `to`, `task`, `files?`, `model?`, `maxTurns?`, `maxBudgetUsd?`, `allowApiKey?` | The full `DelegateResult` as JSON; `isError` when `!ok`. |
-| `prepare_handoff` | `to`, `session?`, `fork?`, `deliver?` | `{ sessionId, peerDestPath, resumeCommand, delivered }`. |
+| `prepare_handoff` | `to`, `session?`, `fork?`, `deliver?`, `installClaude?` | `{ sessionId, peer, peerDestPath, resumeCommand, delivered, claude }`. |
 | `relay_doctor` | (none) | The full `DoctorReport`; `isError` when not ok. |
 
 Because the MCP server is registered in the repo, a running session **and any subagent it
