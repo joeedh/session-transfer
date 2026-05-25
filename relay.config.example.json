@@ -1,0 +1,26 @@
+{
+  "repoRoot": "C:\\dev\\session-transfer",
+  "peers": [
+    {
+      "name": "wsl",
+      "kind": "wsl",
+      "os": "linux",
+      "distro": "Ubuntu",
+      "repoRoot": "/home/youruser/dev/session-transfer"
+    },
+    {
+      "name": "windows",
+      "kind": "windows",
+      "os": "windows",
+      "repoRoot": "C:\\dev\\session-transfer",
+      "claudePath": "C:\\Users\\youruser\\.local\\bin\\claude.exe"
+    },
+    {
+      "name": "gpubox",
+      "kind": "ssh",
+      "os": "linux",
+      "sshTarget": "gpubox",
+      "repoRoot": "/home/youruser/dev/session-transfer"
+    }
+  ]
+}

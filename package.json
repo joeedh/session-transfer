@@ -1,0 +1,36 @@
+{
+  "name": "claude-relay",
+  "version": "0.1.0",
+  "description": "Delegate Claude Code tasks across OS boundaries (Windows <-> WSL, future SSH) and hand off sessions, with built-in billing guardrails.",
+  "type": "module",
+  "bin": {
+    "claude-relay": "dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./mcp": "./dist/mcp-server.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "test": "tsc -p tsconfig.test.json && node --test \"dist-test/test/**/*.test.js\"",
+    "mcp": "node dist/mcp-server.js",
+    "doctor": "node dist/cli.js doctor"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "license": "MIT"
+}
