@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist-test/
+*.log
+relay.config.local.json
+.relay/
+node_modules/.pnpm/
